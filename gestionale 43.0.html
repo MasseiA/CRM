@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Prospezione Clienti - Versione Base</title>
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Font Awesome per le icone -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <!-- SheetJS per importazione Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        .error-banner { background-color: #f8d7da; color: #721c24; padding: 1rem; margin-bottom: 1rem; border: 1px solid #f5c6cb; border-radius: 0.25rem; }
+        .success-banner { background-color: #d4edda; color: #155724; padding: 1rem; margin-bottom: 1rem; border: 1px solid #c3e6cb; border-radius: 0.25rem; }
+        .table-container { overflow-x: auto; max-width: 100%; }
+        @media (min-width: 1024px) { .table-container { overflow-x: visible; } }
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
+        .pagination-buttons { display: flex; align-items: center; }
+        .pagination-button { margin: 0 0.25rem; padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 0.25rem; background-color: white; cursor: pointer; }
+        .pagination-button:hover { background-color: #f3f4f6; }
+        .pagination-button.active { background-color: #3b82f6; color: white; }
+        .pagination-button:disabled { cursor: not-allowed; opacity: 0.5; }
+    /* INIZIO NUOVI STILI PER LA TABELLA */
+    /* Gestione migliore delle tabelle con molte colonne */
+    @media (max-width: 1280px) {
+        .min-w-full { min-width: 1200px; } /* Forza una larghezza minima per la tabella */
+    }
+    
+    /* Migliora la leggibilità delle celle */
+    td, th { 
+        max-width: 200px; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+    }
+    /* FINE NUOVI STILI PER LA TABELLA */
+    </style>
+</head>
+<body class="bg-gray-100">
+    <header class="bg-blue-600 text-white p-4 shadow-md">
+        <div class="container mx-auto max-w-6xl">
+            <h1 class="text-2xl font-bold">Sistema Prospezione Clienti - Versione Base</h1>
+        </div>
+    </header>
+    <main class="container mx-auto p-4 max-w-6xl">
+        <div id="message-container" class="mb-4"></div>
+
+<div class="bg-white rounded shadow-md p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Importazione e Backup Dati</h2>
+    <!-- Sezione importazione Excel -->
+    <div class="mb-4">
+        <input type="file" id="excel-file" accept=".xlsx,.xls" class="hidden">
+        <button id="import-button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <i class="fas fa-file-import mr-2"></i> Importa Excel
+        </button>
+        <span id="file-name" class="ml-4 text-gray-600"></span>
+    </div>
+    <div id="import-stats" class="text-sm text-gray-600 mb-4">
+        Dati importati: <span id="import-count">0</span> aziende
+    </div>
+    
+    <!-- Sezione backup e ripristino UNIFICATA -->
+    <div class="border-t pt-4 mt-4">
+        <h3 class="text-md font-medium mb-2">Backup e Ripristino</h3>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <!-- Salvataggio -->
+            <button id="force-save-button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                <i class="fas fa-save mr-2"></i> Salva Dati
+            </button>
+            
+            <!-- Backup JSON -->
+            <button id="export-backup-button" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                <i class="fas fa-download mr-2"></i> Backup JSON
+            </button>
+            
+            <!-- Ripristino JSON -->
+            <input type="file" id="backup-file" accept=".json" class="hidden">
+            <button id="import-backup-button" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                <i class="fas fa-upload mr-2"></i> Ripristino JSON
+            </button>
+            
+            <!-- Esportazione Excel -->
+            <button id="export-excel-button" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                <i class="fas fa-file-excel mr-2"></i> Esporta Excel
+            </button>
+            
+            <!-- Esportazione CSV -->
+            <button id="export-csv-button" class="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">
+                <i class="fas fa-file-csv mr-2"></i> Esporta CSV
+            </button>
+        </div>
+    </div>
+</div>
+
+</div>
+
+
+
+<div class="bg-white rounded shadow-md p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Filtri</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <!-- Prima riga -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Fonte</label>
+            <input type="text" id="filter-fonte" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Ragione Sociale</label>
+            <input type="text" id="filter-ragione-sociale" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Classe numero dipendenti</label>
+            <select id="filter-classe-dipendenti" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+                <option value="">-- Tutte le classi --</option>
+                <option value="≤ 5">≤ 5</option>
+                <option value="6 - 10">6 - 10</option>
+                <option value="11 - 20">11 - 20</option>
+                <option value="21 - 49">21 - 49</option>
+                <option value="50 - 99">50 - 99</option>
+                <option value="100 - 199">100 - 199</option>
+                <option value="200 - 499">200 - 499</option>
+                <option value="≥ 1000">≥ 1000</option>
+                <option value="N. d.">N. d.</option>
+            </select>
+        </div>
+        
+        <!-- Seconda riga -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Fatturato</label>
+            <select id="filter-fatturato" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+                <option value="">-- Tutti i fatturati --</option>
+                <option value="- 9.999">- 9.999</option>
+                <option value="10.000 - 49.999">10.000 - 49.999</option>
+                <option value="50.000 - 99.999">50.000 - 99.999</option>
+                <option value="100.000 - 499.999">100.000 - 499.999</option>
+                <option value="500.000 - 999.999">500.000 - 999.999</option>
+                <option value="1.000.000 - 4.999.999">1.000.000 - 4.999.999</option>
+                <option value="5.000.000 - 9.999.999">5.000.000 - 9.999.999</option>
+                <option value="10.000.000 - 49.999.999">10.000.000 - 49.999.999</option>
+                <option value="≥ 100.000.000">≥ 100.000.000</option>
+                <option value="N. d.">N. d.</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Città</label>
+            <input type="text" id="filter-citta" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Parco Auto</label>
+            <input type="text" id="filter-parco-auto" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+        </div>
+        
+        <!-- Terza riga - NUOVI FILTRI -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Livello Interesse</label>
+            <select id="filter-livello-interesse" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+                <option value="">-- Tutti i livelli --</option>
+                <option value="caldo">Caldo</option>
+                <option value="tiepido">Tiepido</option>
+                <option value="freddo">Freddo</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Stato Trattativa</label>
+            <select id="filter-stato-trattativa" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full">
+                <option value="">-- Tutti gli stati --</option>
+                <option value="prima visita">Prima visita</option>
+                <option value="richiesta preventivo">Richiesta preventivo</option>
+                <option value="trattativa">Trattativa</option>
+                <option value="contratto">Contratto</option>
+                <option value="fallito">Fallito</option>
+            </select>
+        </div>
+        <div>
+            <!-- Spazio vuoto per mantenere la griglia equilibrata -->
+        </div>
+        
+        <!-- Quarta riga - Filtri per date -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Data prima visita</label>
+            <div class="flex space-x-2">
+                <input type="date" id="filter-prima-visita-da" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full" placeholder="Da">
+                <input type="date" id="filter-prima-visita-a" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full" placeholder="A">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Data ultima visita</label>
+            <div class="flex space-x-2">
+                <input type="date" id="filter-ultima-visita-da" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full" placeholder="Da">
+                <input type="date" id="filter-ultima-visita-a" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full" placeholder="A">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Prossimo appuntamento</label>
+            <div class="flex space-x-2">
+                <input type="date" id="filter-prossimo-appuntamento-da" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full" placeholder="Da">
+                <input type="date" id="filter-prossimo-appuntamento-a" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-full" placeholder="A">
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex justify-between">
+        <button id="apply-filters-button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            <i class="fas fa-filter mr-2"></i> Applica Filtri
+        </button>
+        <button id="reset-filters-button" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+            <i class="fas fa-times mr-2"></i> Reset Filtri
+        </button>
+    </div>
+</div>
+
+
+
+        <div class="bg-white rounded shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Elenco Aziende</h2>
+            <div class="table-container">
+<table class="min-w-full divide-y divide-gray-200">
+    <thead class="bg-gray-50">
+        <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ragione Sociale</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prima Visita</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ultima Visita</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prossimo App.</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Città</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parco Auto</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dipendenti</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fatturato</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Azioni</th>
+        </tr>
+    </thead>
+    <tbody id="aziende-table-body" class="bg-white divide-y divide-gray-200">
+        <tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">Nessun dato disponibile. Importa un file Excel per iniziare.</td></tr>
+    </tbody>
+</table>
+
+<div class="bg-white rounded shadow-md p-6">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Elenco Aziende</h2>
+        <button id="new-azienda-button" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            <i class="fas fa-plus-circle mr-2"></i> Nuova Azienda
+        </button>
+    </div>
+    <div class="table-container">
+        <!-- resto del codice della tabella... -->
+    </div>
+</div>
+
+            </div>
+            <div class="pagination-container">
+                <div class="pagination-buttons">
+                    <button id="prev-page" class="pagination-button" disabled><i class="fas fa-chevron-left"></i> Precedente</button>
+                    <div id="pagination-numbers" class="flex mx-2"></div>
+                    <button id="next-page" class="pagination-button" disabled>Successiva <i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div><select id="items-per-page" class="px-3 py-2 border rounded-md shadow-sm"><option value="10">10 per pagina</option><option value="20">20 per pagina</option><option value="30">30 per pagina</option><option value="40">40 per pagina</option></select></div>
+            </div>
+        </div>
+    </main>
+
+
+
+<div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-5xl max-h-screen overflow-y-auto">
+        <h3 id="modal-title" class="text-lg font-semibold mb-4">Modifica Dati</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- Dati Azienda - Prima colonna (5 campi) -->
+            <div>
+                <h4 class="font-medium text-gray-700 mb-2">Dati Azienda</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ragione Sociale</label>
+                        <input type="text" id="edit-ragione-sociale" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Insegna</label>
+                        <input type="text" id="edit-insegna" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">P. IVA</label>
+                        <input type="text" id="edit-partita-iva" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Classe numero dipendenti</label>
+                        <input type="text" id="edit-classe-dipendenti" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fatturato</label>
+                        <input type="text" id="edit-fatturato" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dati Sede - Seconda colonna (7 campi per bilanciare) -->
+            <div>
+                <h4 class="font-medium text-gray-700 mb-2">Dati Sede e Stato</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Via</label>
+                        <input type="text" id="edit-via" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Città</label>
+                        <input type="text" id="edit-citta" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">CAP</label>
+                        <input type="text" id="edit-cap" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email Azienda</label>
+                        <input type="email" id="edit-email" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Telefono Azienda</label>
+                        <input type="text" id="edit-telefono" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <!-- SPOSTATI QUI I DUE NUOVI CAMPI -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Livello Interesse</label>
+                        <select id="edit-livello-interesse" class="px-3 py-2 border rounded-md w-full">
+                            <option value="">-- Seleziona livello --</option>
+                            <option value="caldo">Caldo</option>
+                            <option value="tiepido">Tiepido</option>
+                            <option value="freddo">Freddo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Stato Trattativa</label>
+                        <select id="edit-stato-trattativa" class="px-3 py-2 border rounded-md w-full">
+                            <option value="">-- Seleziona stato --</option>
+                            <option value="prima visita">Prima visita</option>
+                            <option value="richiesta preventivo">Richiesta preventivo</option>
+                            <option value="trattativa">Trattativa</option>
+                            <option value="contratto">Contratto</option>
+                            <option value="fallito">Fallito</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dati Contatto - Terza colonna (5 campi) -->
+            <div>
+                <h4 class="font-medium text-gray-700 mb-2">Persona di Contatto</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                        <input type="text" id="edit-nome-contatto" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cognome</label>
+                        <input type="text" id="edit-cognome-contatto" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Qualifica</label>
+                        <input type="text" id="edit-qualifica-contatto" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
+                        <input type="text" id="edit-tel-contatto" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="edit-mail-contatto" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Parco Auto e Visite - Seconda riga (rimane uguale) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <!-- Parco Auto - Prima colonna -->
+            <div>
+                <h4 class="font-medium text-gray-700 mb-2">Parco Auto</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">PARCO AUTO (MIS)</label>
+                        <input type="text" id="edit-parco-auto" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Di proprietà</label>
+                        <input type="text" id="edit-auto-proprieta" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">A noleggio</label>
+                        <input type="text" id="edit-auto-noleggio" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Date Visite - Seconda colonna -->
+            <div>
+                <h4 class="font-medium text-gray-700 mb-2">Visite</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data prima visita</label>
+                        <input type="date" id="edit-prima-visita" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Report prima visita</label>
+                        <textarea id="edit-report-prima-visita" class="px-3 py-2 border rounded-md w-full" rows="2"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data ultima visita</label>
+                        <input type="date" id="edit-ultima-visita" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Report ultima visita</label>
+                        <textarea id="edit-report-ultima-visita" class="px-3 py-2 border rounded-md w-full" rows="2"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data prossima visita</label>
+                        <input type="date" id="edit-prossimo-appuntamento" class="px-3 py-2 border rounded-md w-full">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Accordi -->
+        <div class="mb-6">
+            <h4 class="font-medium text-gray-700 mb-2">Accordi</h4>
+            <textarea id="edit-accordi" class="px-3 py-2 border rounded-md w-full" rows="4"></textarea>
+        </div>
+        
+        <div class="flex justify-between mt-6">
+            <button id="modal-print" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                <i class="fas fa-print mr-2"></i> Stampa
+            </button>
+            <div class="space-x-3">
+                <button id="modal-cancel" class="px-4 py-2 bg-gray-200 rounded">Annulla</button>
+                <button id="modal-save" class="px-4 py-2 bg-blue-600 text-white rounded">Salva</button>
+            </div>
+        </div>
+        <input type="hidden" id="edit-azienda-index">
+    </div>
+</div>
+
+
+
+
+
+
+    <script>
+const db = {
+    name: 'miniCRM',
+    version: 1,
+    
+    open() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.name, this.version);
+            
+            request.onupgradeneeded = event => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('aziende')) {
+                    db.createObjectStore('aziende', { keyPath: 'id' });
+                }
+            };
+            
+            request.onsuccess = event => resolve(event.target.result);
+            request.onerror = event => reject(event.target.error);
+        });
+    },
+    
+    saveAziende(aziende) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const db = await this.open();
+                const transaction = db.transaction('aziende', 'readwrite');
+                const store = transaction.objectStore('aziende');
+                
+                // Pulisci lo store
+                store.clear();
+                
+                // Converti le date in stringhe ISO
+                const dataToSave = aziende.map(a => ({
+                    ...a,
+                    dataPrimaVisita: a.dataPrimaVisita ? a.dataPrimaVisita.toISOString() : null,
+                    dataUltimaVisita: a.dataUltimaVisita ? a.dataUltimaVisita.toISOString() : null,
+                    prossimoAppuntamento: a.prossimoAppuntamento ? a.prossimoAppuntamento.toISOString() : null
+                }));
+                
+                // Salva ogni azienda
+                for (const azienda of dataToSave) {
+                    store.add(azienda);
+                }
+                
+                transaction.oncomplete = () => {
+                    console.log(`Salvate ${dataToSave.length} aziende in IndexedDB`);
+                    resolve(true);
+                };
+                
+                transaction.onerror = event => reject(event.target.error);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    },
+    
+    loadAziende() {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const db = await this.open();
+                const transaction = db.transaction('aziende', 'readonly');
+                const store = transaction.objectStore('aziende');
+                
+                const request = store.getAll();
+                
+                request.onsuccess = event => {
+                    const data = event.target.result;
+                    
+                    // Converti le stringhe ISO in oggetti Date
+                    const aziende = data.map(item => ({
+                        ...item,
+                        dataPrimaVisita: item.dataPrimaVisita ? new Date(item.dataPrimaVisita) : null,
+                        dataUltimaVisita: item.dataUltimaVisita ? new Date(item.dataUltimaVisita) : null,
+                        prossimoAppuntamento: item.prossimoAppuntamento ? new Date(item.prossimoAppuntamento) : null
+                    }));
+                    
+                    console.log(`Caricate ${aziende.length} aziende da IndexedDB`);
+                    resolve(aziende);
+                };
+                
+                request.onerror = event => reject(event.target.error);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+};
+        let aziende = [];
+        let filteredAziende = [];
+        let isFiltering = false;
+        let currentPage = 1;
+        let itemsPerPage = 10;
+	let autoSaveInterval;
+
+// Funzioni per interagire con il database
+async function saveToDatabase() {
+    try {
+        showMessage('Salvataggio dati in corso...', 'success');
+        await db.saveAziende(aziende);
+        showMessage('Dati salvati con successo.', 'success');
+        return true;
+    } catch (error) {
+        console.error('Errore nel salvataggio dati:', error);
+        showMessage('Errore nel salvataggio dati.', 'error');
+        return false;
+    }
+}
+
+async function loadFromDatabase() {
+    try {
+        const data = await db.loadAziende();
+        if (data && data.length > 0) {
+            aziende = data;
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Errore nel caricamento dati:', error);
+        return false;
+    }
+}
+
+        function showMessage(message, type) {
+            const container = document.getElementById('message-container');
+            const banner = document.createElement('div');
+            banner.className = type === 'error' ? 'error-banner' : 'success-banner';
+            banner.innerHTML = `<div class="flex justify-between items-center"><div><i class="fas ${type==='error'?'fa-exclamation-circle':'fa-check-circle'}"></i><span class="ml-2">${message}</span></div><button onclick="this.parentElement.parentElement.remove()"><i class="fas fa-times"></i></button></div>`;
+            container.appendChild(banner);
+            setTimeout(() => { banner.remove(); }, 5000);
+        }
+
+        function formatDate(d) {
+            if (!d) return '-';
+            const date = d instanceof Date ? d : new Date(d);
+            return date.toLocaleDateString('it-IT');
+        }
+
+// Sostituisci saveToLocalStorage con questa funzione
+async function saveToDatabase() {
+    try {
+        showMessage('Salvataggio dati in corso...', 'success');
+        await db.saveAziende(aziende);
+        showMessage('Dati salvati con successo.', 'success');
+        return true;
+    } catch (error) {
+        console.error('Errore nel salvataggio dati:', error);
+        showMessage('Errore nel salvataggio dati.', 'error');
+        return false;
+    }
+}
+
+// Test del localStorage
+const testKey = 'miniCRM_test';
+try {
+    localStorage.setItem(testKey, 'test_value');
+    const testValue = localStorage.getItem(testKey);
+    if (testValue === 'test_value') {
+        console.log('localStorage è operativo');
+    } else {
+        console.warn('localStorage non funziona correttamente');
+    }
+    localStorage.removeItem(testKey);
+} catch (e) {
+    console.error('localStorage non disponibile:', e);
+}
+
+function checkLocalStorageSize() {
+    let totalSize = 0;
+    for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+            totalSize += localStorage[key].length;
+        }
+    }
+    
+    const sizeInKB = totalSize / 1024;
+    console.log(`Dimensione localStorage: ${sizeInKB.toFixed(2)} KB`);
+    
+    // La maggior parte dei browser supporta fino a 5MB
+    const percentUsed = (sizeInKB / 5120) * 100;
+    console.log(`Spazio utilizzato: ${percentUsed.toFixed(2)}%`);
+    
+    return sizeInKB;
+}
+
+// Funzione per esportare i dati in Excel
+function exportToExcel() {
+    try {
+        if (aziende.length === 0) {
+            showMessage('Nessun dato disponibile per l\'esportazione.', 'error');
+            return;
+        }
+        
+        showMessage('Preparazione file Excel in corso...', 'success');
+        
+        // Prepara i dati per Excel mantenendo tutti i campi
+        const excelData = aziende.map(a => ({
+            'Ragione Sociale': a.ragioneSociale || a['Ragione Sociale'] || '',
+            'Partita iva': a.partitaIva || a['Partita iva'] || '',
+            'Insegna': a.insegna || a['Insegna'] || '',
+            'Via': a.indirizzo || a['Via'] || '',
+            'Città': a.citta || a['Città'] || '',
+            'Cap': a.cap || a['Cap'] || '',
+            'Email': a.email || a['Email'] || '',
+            'Telefono': a.telefono || a['Telefono'] || '',
+            'Nome persona di contatto': a.nomeContatto || a['Nome persona di contatto'] || '',
+            'Cognome persona di contatto': a.cognomeContatto || a['Cognome persona di contatto'] || '',
+            'Qualifica persona di contatto': a.qualificaContatto || a['Qualifica persona di contatto'] || '',
+            'Tel. Persona di contatto': a.telContatto || a['Tel. Persona di contatto'] || '',
+            'Mail persona di contatto': a.mailContatto || a['Mail persona di contatto'] || '',
+            'PARCO AUTO (MIS)': a.parcoAuto || a['PARCO AUTO (MIS)'] || '',
+            'Auto di proprietà': a.autoProprietà || '',
+            'Auto a noleggio': a.autoNoleggio || '',
+            'Classe numero dipendenti': a.classeDipendenti || a['Classe numero dipendenti'] || '',
+            'FATTURATO': a.fatturato || a['FATTURATO'] || '',
+            'FONTE': a.fonte || a['FONTE'] || '',
+            'Data prima visita': a.dataPrimaVisita || null,
+            'Report prima visita': a.reportPrimaVisita || '',
+            'Data ultima visita': a.dataUltimaVisita || null,
+            'Report ultima visita': a.reportUltimaVisita || '',
+            'Data prossima visita': a.prossimoAppuntamento || null,
+            'Accordi': a.accordi || a['Accordi'] || ''
+        }));
+        
+        // Crea un nuovo workbook
+        const wb = XLSX.utils.book_new();
+        
+        // Converti i dati in un worksheet
+        const ws = XLSX.utils.json_to_sheet(excelData);
+        
+        // Formatta le colonne delle date
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let row = range.s.r + 1; row <= range.e.r; row++) {
+            // Colonne delle date: T (Data prima visita), V (Data ultima visita), X (Data prossima visita)
+            ['T', 'V', 'X'].forEach(col => {
+                const cellRef = col + (row + 1);
+                if (ws[cellRef] && ws[cellRef].v instanceof Date) {
+                    ws[cellRef].t = 'd';
+                    ws[cellRef].z = 'dd/mm/yyyy';
+                }
+            });
+        }
+        
+        // Aggiungi il worksheet al workbook
+        XLSX.utils.book_append_sheet(wb, ws, "Aziende");
+        
+        // Genera il nome del file con timestamp
+        const today = new Date().toISOString().split('T')[0];
+        const timestamp = new Date().toLocaleTimeString('it-IT', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        }).replace(':', '');
+        const excelFileName = `database_aziende_${today}_${timestamp}.xlsx`;
+        
+        // Genera e scarica il file Excel
+        XLSX.writeFile(wb, excelFileName);
+        
+        showMessage(`File Excel generato con successo: ${aziende.length} aziende esportate.`, 'success');
+    } catch (error) {
+        console.error('Errore nell\'esportazione Excel:', error);
+        showMessage('Errore durante la creazione del file Excel.', 'error');
+    }
+}
+
+// Funzione per esportare i dati in CSV
+function exportToCSV() {
+    try {
+        if (aziende.length === 0) {
+            showMessage('Nessun dato disponibile per l\'esportazione.', 'error');
+            return;
+        }
+        
+        showMessage('Preparazione file CSV in corso...', 'success');
+        
+        // Definisci le intestazioni delle colonne
+        const headers = [
+            'Ragione Sociale', 'Partita iva', 'Insegna', 'Via', 'Città', 'Cap', 
+            'Email', 'Telefono', 'Nome persona di contatto', 'Cognome persona di contatto',
+            'Qualifica persona di contatto', 'Tel. Persona di contatto', 'Mail persona di contatto',
+            'PARCO AUTO (MIS)', 'Auto di proprietà', 'Auto a noleggio', 
+            'Classe numero dipendenti', 'FATTURATO', 'FONTE',
+            'Data prima visita', 'Report prima visita', 'Data ultima visita', 
+            'Report ultima visita', 'Data prossima visita', 'Accordi'
+        ];
+        
+        // Funzione per formattare una data per CSV
+        function formatDateForCSV(date) {
+            if (!date) return '';
+            if (!(date instanceof Date)) return '';
+            return date.toLocaleDateString('it-IT');
+        }
+        
+        // Funzione per escapare i valori CSV (gestisce virgole e virgolette)
+        function escapeCSV(value) {
+            if (value === null || value === undefined) return '';
+            const stringValue = String(value);
+            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                return '"' + stringValue.replace(/"/g, '""') + '"';
+            }
+            return stringValue;
+        }
+        
+        // Crea le righe del CSV
+        const csvRows = [];
+        csvRows.push(headers.map(escapeCSV).join(','));
+        
+        // Aggiungi i dati
+        aziende.forEach(a => {
+            const row = [
+                a.ragioneSociale || a['Ragione Sociale'] || '',
+                a.partitaIva || a['Partita iva'] || '',
+                a.insegna || a['Insegna'] || '',
+                a.indirizzo || a['Via'] || '',
+                a.citta || a['Città'] || '',
+                a.cap || a['Cap'] || '',
+                a.email || a['Email'] || '',
+                a.telefono || a['Telefono'] || '',
+                a.nomeContatto || a['Nome persona di contatto'] || '',
+                a.cognomeContatto || a['Cognome persona di contatto'] || '',
+                a.qualificaContatto || a['Qualifica persona di contatto'] || '',
+                a.telContatto || a['Tel. Persona di contatto'] || '',
+                a.mailContatto || a['Mail persona di contatto'] || '',
+                a.parcoAuto || a['PARCO AUTO (MIS)'] || '',
+                a.autoProprietà || '',
+                a.autoNoleggio || '',
+                a.classeDipendenti || a['Classe numero dipendenti'] || '',
+                a.fatturato || a['FATTURATO'] || '',
+                a.fonte || a['FONTE'] || '',
+                formatDateForCSV(a.dataPrimaVisita),
+                a.reportPrimaVisita || '',
+                formatDateForCSV(a.dataUltimaVisita),
+                a.reportUltimaVisita || '',
+                formatDateForCSV(a.prossimoAppuntamento),
+                a.accordi || a['Accordi'] || ''
+            ];
+            csvRows.push(row.map(escapeCSV).join(','));
+        });
+        
+        // Crea il blob CSV
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // Genera il nome del file con timestamp
+        const today = new Date().toISOString().split('T')[0];
+        const timestamp = new Date().toLocaleTimeString('it-IT', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        }).replace(':', '');
+        const csvFileName = `database_aziende_${today}_${timestamp}.csv`;
+        
+        // Scarica il file
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = csvFileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showMessage(`File CSV generato con successo: ${aziende.length} aziende esportate.`, 'success');
+    } catch (error) {
+        console.error('Errore nell\'esportazione CSV:', error);
+        showMessage('Errore durante la creazione del file CSV.', 'error');
+    }
+}
+
+// Funzione per avviare l'autosave
+function startAutoSave(intervalMinutes = 5) {
+    // Pulisci eventuali interval precedenti
+    if (autoSaveInterval) clearInterval(autoSaveInterval);
+    
+    // Imposta il nuovo interval (in millisecondi)
+    const intervalMs = intervalMinutes * 60 * 1000;
+    autoSaveInterval = setInterval(async () => {
+        if (aziende.length > 0) {
+            const saved = await saveToDatabase();
+            if (saved) {
+                console.log(`Salvataggio automatico completato: ${new Date().toLocaleTimeString()}`);
+            }
+        }
+    }, intervalMs);
+    
+    console.log(`Salvataggio automatico attivato ogni ${intervalMinutes} minuti`);
+}
+
+// Sostituisci loadFromLocalStorage con questa funzione
+async function loadFromDatabase() {
+    try {
+        const data = await db.loadAziende();
+        if (data && data.length > 0) {
+            aziende = data;
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Errore nel caricamento dati:', error);
+        return false;
+    }
+}
+
+// Sostituisci completamente la funzione importExcel
+async function importExcel(file) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            showMessage('Elaborazione in corso...', 'success');
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array', cellDates: true });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            // Forza l'importazione di tutte le colonne del foglio
+		const json = XLSX.utils.sheet_to_json(ws, { 
+    		raw: true,
+    		defval: '', // Valore di default per celle vuote
+    		range: undefined // Importa tutto il range
+	});
+            if (json.length === 0) { showMessage('File vuoto.', 'error'); return; }
+            
+            // NUOVA FUNZIONE: ripara esplicitamente le date aggiungendo un giorno
+            function fixExcelDate(excelDate) {
+                if (!excelDate) return null;
+                
+                // Se è già un oggetto Date
+                if (excelDate instanceof Date) {
+                    // Creiamo una nuova data AGGIUNGENDO UN GIORNO ESPLICITAMENTE
+                    const correctedDate = new Date(excelDate);
+                    correctedDate.setDate(correctedDate.getDate() + 1); // AGGIUNGI 1 GIORNO
+                    
+                    // Estrai solo anno, mese, giorno (senza ore/minuti/secondi)
+                    const year = correctedDate.getFullYear();
+                    const month = correctedDate.getMonth();
+                    const day = correctedDate.getDate();
+                    
+                    return new Date(year, month, day, 12, 0, 0);
+                }
+                return null;
+            }
+            
+            // Debug delle date per verificare la correzione
+            if (json.length > 0 && json[0]['Data prima visita'] instanceof Date) {
+                const originalDate = json[0]['Data prima visita'];
+                const correctedDate = fixExcelDate(originalDate);
+                console.log("DEBUG DATE:");
+                console.log("  Original Excel date:", originalDate.toLocaleDateString());
+                console.log("  Corrected date:", correctedDate.toLocaleDateString());
+            }
+            
+            // Importa tutti i dati con correzione esplicita delle date
+            aziende = json.map((row, i) => ({ 
+                ...row, // mantiene tutti i campi originali
+                id: i,
+                // Correzione ESPLICITA delle date (aggiungi 1 giorno)
+                dataPrimaVisita: fixExcelDate(row['Data prima visita']),
+                dataUltimaVisita: fixExcelDate(row['Data ultima visita']),
+                prossimoAppuntamento: fixExcelDate(row['Data prossima visita']),
+                accordi: row['Accordi'] || '',
+                fonte: row['FONTE'] || '',
+                ragioneSociale: row['Ragione Sociale'] || '',
+                partitaIva: row['Partita iva'] || '',
+                insegna: row['Insegna'] || '',
+                indirizzo: row['Via'] || '',
+                cap: row['Cap'] || '',
+                citta: row['Città'] || '',
+                classeDipendenti: row['Classe numero dipendenti'] || '',
+                fatturato: row[' FATTURATO '] || row['FATTURATO'] || row['Fatturato'] || row['fatturato'] || '',
+                nomeContatto: row['Nome persona di contatto'] || '',
+                cognomeContatto: row['Cognome persona di contatto'] || '',
+                qualificaContatto: row['Qualifica persona di contatto'] || '',
+                telContatto: row['Tel. Persona di contatto'] || '',
+                mailContatto: row['Mail persona di contatto'] || '',
+                parcoAuto: row['PARCO AUTO (MIS)'] || ''
+            }));
+
+console.log("Debug primo record importato:");
+if (aziende.length > 0) {
+    console.log("FATTURATO:", aziende[0].fatturato);
+    console.log("FATTURATO originale:", aziende[0]['FATTURATO']);
+    console.log("Numero totale campi:", Object.keys(aziende[0]).length);
+    
+    // Mostra TUTTI i nomi delle colonne
+    console.log("Tutti i nomi delle colonne:");
+    Object.keys(aziende[0]).forEach((key, index) => {
+        console.log(`${index + 1}. "${key}"`);
+    });
+    
+    // Cerca colonne che contengono "fatturato" (minuscolo)
+    const fatturatoFields = Object.keys(aziende[0]).filter(key => 
+        key.toLowerCase().includes('fatturato')
+    );
+    console.log("Colonne contenenti 'fatturato' (minuscolo):", fatturatoFields);
+    
+    // NUOVO: Cerca colonne che contengono "FATTURATO" (maiuscolo)
+    const fatturatoFieldsUpper = Object.keys(aziende[0]).filter(key => 
+        key.includes('FATTURATO')
+    );
+    console.log("Colonne contenenti 'FATTURATO' (maiuscolo):", fatturatoFieldsUpper);
+    
+    // Mostra i valori di tutte le colonne fatturato trovate
+    fatturatoFields.forEach(field => {
+        console.log(`Valore di "${field}" (minuscolo):`, aziende[0][field]);
+    });
+    
+    fatturatoFieldsUpper.forEach(field => {
+        console.log(`Valore di "${field}" (maiuscolo):`, aziende[0][field]);
+    });
+    
+    // NUOVO: Cerca anche le colonne che potrebbero essere tarde nell'importazione
+    const lateColumns = Object.keys(aziende[0]).filter(key => 
+        key.includes('Anno') || key.includes('esercizio') || key.includes('Trend')
+    );
+    console.log("Colonne contenenti 'Anno', 'esercizio' o 'Trend':", lateColumns);
+}
+            
+            document.getElementById('file-name').textContent = file.name;
+            document.getElementById('import-count').textContent = aziende.length;
+            document.getElementById('import-stats').classList.remove('hidden');
+            currentPage = 1; 
+            updateTable();
+
+            // SALVATAGGIO ESPLICITO - non condizionato
+            const saved = await saveToDatabase();
+            
+            let statusMessage = `Importazione completata: ${aziende.length} aziende caricate`;
+            if (saved) {
+                statusMessage += ' e salvate nel database.';
+            } else {
+                statusMessage += ', ma si è verificato un errore nel salvataggio.';
+                console.error('Errore nel salvataggio dei dati al database');
+            }
+            
+            showMessage(statusMessage, saved ? 'success' : 'error');
+            
+        } catch(err) {
+            console.error(err);
+            showMessage(`Errore import: ${err.message}`, 'error');
+        }
+    };
+    reader.onerror = () => showMessage('Errore lettura file.', 'error');
+    reader.readAsArrayBuffer(file);
+}
+
+function updateTable() {
+    const tbody = document.getElementById('aziende-table-body');
+    tbody.innerHTML = '';
+    const arr = isFiltering ? filteredAziende : aziende;
+    if (arr.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">${isFiltering?'Nessun risultato.':'Nessun dato disponibile.'}</td></tr>`;
+        document.getElementById('prev-page').disabled = true;
+        document.getElementById('next-page').disabled = true;
+        document.getElementById('pagination-numbers').innerHTML = '';
+        return;
+    }
+    const start = (currentPage-1)*itemsPerPage;
+    const end = Math.min(start+itemsPerPage, arr.length);
+    arr.slice(start, end).forEach((a, idx) => {
+        const row = document.createElement('tr');
+        row.className = idx%2?'bg-gray-50':'bg-white';
+        row.innerHTML = `
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm font-medium text-gray-900">${a.ragioneSociale || a['Ragione Sociale'] || 'N/D'}</div>
+    <div class="text-xs text-gray-500">${a.partitaIva || a['Partita iva'] || ''}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900">${formatDate(a.dataPrimaVisita)}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900">${formatDate(a.dataUltimaVisita)}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900">${formatDate(a.prossimoAppuntamento)}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900">${a.citta || a['Città'] || '-'}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900">${a.parcoAuto || a['PARCO AUTO (MIS)'] || '-'}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900">${a.classeDipendenti || a['Classe numero dipendenti'] || '-'}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900">${a.fatturato || a['FATTURATO'] || '-'}</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+    <button class="text-blue-600 hover:text-blue-900" onclick="editAzienda(${start + idx})">
+        <i class="fas fa-edit"></i> Modifica
+    </button>
+</td>
+`;
+        tbody.appendChild(row);
+    });
+    updatePagination(arr.length);
+}
+
+
+        function updatePagination(total) {
+    const prevBtn = document.getElementById('prev-page');
+    const nextBtn = document.getElementById('next-page');
+    const pageNumsDiv = document.getElementById('pagination-numbers');
+    
+    const totalPages = Math.ceil(total / itemsPerPage);
+    
+    // Abilita/disabilita pulsanti prev/next
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
+    
+    // Aggiorna i numeri di pagina
+    pageNumsDiv.innerHTML = '';
+    
+    // Determina l'intervallo di pagine da mostrare (max 5)
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    
+    // Aggiusta se siamo vicini alla fine
+    if (endPage - startPage < 4 && startPage > 1) {
+        startPage = Math.max(1, endPage - 4);
+    }
+    
+    // Crea i bottoni numerati delle pagine
+    for (let i = startPage; i <= endPage; i++) {
+        const btn = document.createElement('button');
+        btn.className = `pagination-button ${i === currentPage ? 'active' : ''}`;
+        btn.textContent = i;
+        btn.addEventListener('click', () => goToPage(i));
+        pageNumsDiv.appendChild(btn);
+    }
+}
+        function goToPage(p) { currentPage = p; updateTable(); }
+// Funzione per esportare i dati come file JSON
+function exportBackup() {
+    try {
+        const dataToExport = aziende.map(a => ({
+            ...a,
+            dataPrimaVisita: a.dataPrimaVisita ? a.dataPrimaVisita.toISOString() : null,
+            dataUltimaVisita: a.dataUltimaVisita ? a.dataUltimaVisita.toISOString() : null,
+            prossimoAppuntamento: a.prossimoAppuntamento ? a.prossimoAppuntamento.toISOString() : null
+        }));
+        
+        const jsonString = JSON.stringify(dataToExport, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const today = new Date().toISOString().split('T')[0];
+        const fileName = `mini-crm-backup-${today}.json`;
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showMessage('Backup esportato con successo.', 'success');
+    } catch (error) {
+        console.error('Errore nell\'esportazione backup:', error);
+        showMessage('Errore durante l\'esportazione del backup.', 'error');
+    }
+}
+
+// Funzione per importare un backup
+async function importBackup(file) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            showMessage('Elaborazione backup in corso...', 'success');
+            const jsonData = JSON.parse(e.target.result);
+            
+            // Converti le stringhe ISO in oggetti Date
+            aziende = jsonData.map((item, i) => ({
+                ...item,
+                id: i,
+                dataPrimaVisita: item.dataPrimaVisita ? new Date(item.dataPrimaVisita) : null,
+                dataUltimaVisita: item.dataUltimaVisita ? new Date(item.dataUltimaVisita) : null,
+                prossimoAppuntamento: item.prossimoAppuntamento ? new Date(item.prossimoAppuntamento) : null
+            }));
+            
+            // Salva nel database
+            const saved = await saveToDatabase();
+            
+            // Aggiorna UI
+            document.getElementById('file-name').textContent = file.name;
+            document.getElementById('import-count').textContent = aziende.length;
+            document.getElementById('import-stats').classList.remove('hidden');
+            currentPage = 1;
+            updateTable();
+            
+            showMessage(`Backup importato con successo: ${aziende.length} aziende caricate.`, 'success');
+        } catch (error) {
+            console.error('Errore importazione backup:', error);
+            showMessage(`Errore importazione backup: ${error.message}`, 'error');
+        }
+    };
+    reader.onerror = () => showMessage('Errore lettura file backup.', 'error');
+    reader.readAsText(file);
+}
+
+
+function applyFilters() {
+
+    // DEBUG TEMPORANEO
+    console.log("Debug filtri - primi 3 record:");
+    for (let i = 0; i < Math.min(3, aziende.length); i++) {
+        console.log(`Record ${i + 1}:`);
+        console.log("  livelloInteresse:", aziende[i].livelloInteresse);
+        console.log("  statoTrattativa:", aziende[i].statoTrattativa);
+        console.log("  Tutti i campi:", Object.keys(aziende[i]));
+    }
+
+
+    // Ottieni valori dai campi di filtro di testo
+    const fonte = document.getElementById('filter-fonte').value.toLowerCase().trim();
+    const ragioneSociale = document.getElementById('filter-ragione-sociale').value.toLowerCase().trim();
+    const classeDipendenti = document.getElementById('filter-classe-dipendenti').value.toLowerCase().trim();
+    const fatturato = document.getElementById('filter-fatturato').value.toLowerCase().trim();
+    const citta = document.getElementById('filter-citta').value.toLowerCase().trim();
+    const parcoAuto = document.getElementById('filter-parco-auto').value.toLowerCase().trim();
+
+    // NUOVI FILTRI
+    const livelloInteresse = document.getElementById('filter-livello-interesse').value;
+    const statoTrattativa = document.getElementById('filter-stato-trattativa').value;
+    
+    // Ottieni valori dai campi di filtro di date
+    const primaDa = document.getElementById('filter-prima-visita-da').valueAsDate;
+    const primaA = document.getElementById('filter-prima-visita-a').valueAsDate;
+    const ultimaDa = document.getElementById('filter-ultima-visita-da').valueAsDate;
+    const ultimaA = document.getElementById('filter-ultima-visita-a').valueAsDate;
+    const proxDa = document.getElementById('filter-prossimo-appuntamento-da').valueAsDate;
+    const proxA = document.getElementById('filter-prossimo-appuntamento-a').valueAsDate;
+
+// Se nessun filtro è stato impostato, resetta tutto
+if (!fonte.trim() && !ragioneSociale.trim() && !classeDipendenti && !fatturato && 
+    !citta.trim() && !parcoAuto.trim() && 
+    !livelloInteresse && !statoTrattativa &&
+    !primaDa && !primaA && !ultimaDa && !ultimaA && !proxDa && !proxA) {
+        isFiltering = false;
+        filteredAziende = [];
+        currentPage = 1;
+        updateTable();
+        return;
+    }
+
+    // Utility: tronca un Date a mezzanotte locale (rimuove ore/min/sec)
+    function toMidnight(d) {
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    // Utility per verificare se una stringa contiene una sottostringa, ignorando case e accenti
+    function containsText(text, searchTerm) {
+        if (!text) return false;
+        return text.toString().toLowerCase().includes(searchTerm);
+    }
+
+    isFiltering = true;
+    filteredAziende = aziende.filter(a => {
+        // Filtri di testo
+        if (fonte && !containsText(a.fonte || a['FONTE'], fonte)) return false;
+        if (ragioneSociale && !containsText(a.ragioneSociale || a['Ragione Sociale'], ragioneSociale)) return false;
+        if (classeDipendenti && !containsText(a.classeDipendenti || a['Classe numero dipendenti'], classeDipendenti)) return false;
+        if (fatturato && !containsText(a.fatturato || a['FATTURATO'], fatturato)) return false;
+        if (citta && !containsText(a.citta || a['Città'], citta)) return false;
+        if (parcoAuto && !containsText(a.parcoAuto || a['PARCO AUTO (MIS)'], parcoAuto)) return false;
+
+// NUOVI FILTRI - versione più robusta
+if (livelloInteresse) {
+    const aziendaLivello = a.livelloInteresse || '';
+    if (aziendaLivello !== livelloInteresse) return false;
+}
+if (statoTrattativa) {
+    const aziendaStato = a.statoTrattativa || '';
+    if (aziendaStato !== statoTrattativa) return false;
+}
+
+        
+        // Filtri di date
+        const dpv = a.dataPrimaVisita;
+        const duv = a.dataUltimaVisita;
+        const dpa = a.prossimoAppuntamento;
+
+        // Data prima visita
+        if (primaDa) {
+            if (!dpv || toMidnight(dpv) < toMidnight(primaDa)) return false;
+        }
+        if (primaA) {
+            if (!dpv || toMidnight(dpv) > toMidnight(primaA)) return false;
+        }
+        
+        // Data ultima visita
+        if (ultimaDa) {
+            if (!duv || toMidnight(duv) < toMidnight(ultimaDa)) return false;
+        }
+        if (ultimaA) {
+            if (!duv || toMidnight(duv) > toMidnight(ultimaA)) return false;
+        }
+        
+        // Prossimo appuntamento
+        if (proxDa) {
+            if (!dpa || toMidnight(dpa) < toMidnight(proxDa)) return false;
+        }
+        if (proxA) {
+            if (!dpa || toMidnight(dpa) > toMidnight(proxA)) return false;
+        }
+
+        // Se passa tutti i filtri, includi l'azienda
+        return true;
+    });
+
+    // Riparto da pagina 1 e mostro risultati
+    currentPage = 1;
+    updateTable();
+    showMessage(`Filtri applicati: ${filteredAziende.length} aziende trovate.`, 'success');
+}
+
+
+function resetFilters() {
+    // Reset dei filtri di testo
+    document.getElementById('filter-fonte').value = '';
+    document.getElementById('filter-ragione-sociale').value = '';
+    document.getElementById('filter-classe-dipendenti').value = '';
+    document.getElementById('filter-fatturato').value = '';
+    document.getElementById('filter-citta').value = '';
+    document.getElementById('filter-parco-auto').value = '';
+
+    // RESET DEI NUOVI FILTRI
+    document.getElementById('filter-livello-interesse').value = '';
+    document.getElementById('filter-stato-trattativa').value = '';
+    
+    // Reset dei filtri di date
+    document.getElementById('filter-prima-visita-da').value = '';
+    document.getElementById('filter-prima-visita-a').value = '';
+    document.getElementById('filter-ultima-visita-da').value = '';
+    document.getElementById('filter-ultima-visita-a').value = '';
+    document.getElementById('filter-prossimo-appuntamento-da').value = '';
+    document.getElementById('filter-prossimo-appuntamento-a').value = '';
+    
+    // Reset dello stato di filtraggio
+    isFiltering = false;
+    filteredAziende = [];
+    currentPage = 1;
+    updateTable();
+    showMessage('Filtri resettati.', 'success');
+}
+
+
+async function saveAzienda() {
+    // Ottieni l'indice dell'azienda da modificare
+    const indexValue = document.getElementById('edit-azienda-index').value;
+    
+    // Funzione helper per creare date alle 12:00
+    function createNoonDate(dateString) {
+        if (!dateString) return null;
+        const parts = dateString.split('-');
+        return new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]), 12, 0, 0);
+    }
+    
+    // Crea un oggetto con i dati dai campi del form
+    const aziendaData = {
+        // Dati azienda
+        ragioneSociale: document.getElementById('edit-ragione-sociale').value,
+        insegna: document.getElementById('edit-insegna').value,
+        partitaIva: document.getElementById('edit-partita-iva').value,
+        classeDipendenti: document.getElementById('edit-classe-dipendenti').value,  // NUOVO
+    	fatturato: document.getElementById('edit-fatturato').value,                 // NUOVO
+
+	// NUOVI CAMPI DA AGGIUNGERE
+    	livelloInteresse: document.getElementById('edit-livello-interesse').value,
+    	statoTrattativa: document.getElementById('edit-stato-trattativa').value,
+
+        // Dati sede
+        indirizzo: document.getElementById('edit-via').value,
+        citta: document.getElementById('edit-citta').value,
+        cap: document.getElementById('edit-cap').value,
+        email: document.getElementById('edit-email').value,
+        telefono: document.getElementById('edit-telefono').value,
+        
+        // Dati contatto
+        nomeContatto: document.getElementById('edit-nome-contatto').value,
+        cognomeContatto: document.getElementById('edit-cognome-contatto').value,
+        qualificaContatto: document.getElementById('edit-qualifica-contatto').value,
+        telContatto: document.getElementById('edit-tel-contatto').value,
+        mailContatto: document.getElementById('edit-mail-contatto').value,
+        
+        // Dati parco auto
+        parcoAuto: document.getElementById('edit-parco-auto').value,
+        autoProprietà: document.getElementById('edit-auto-proprieta').value,
+        autoNoleggio: document.getElementById('edit-auto-noleggio').value,
+        
+        // Dati visite
+        dataPrimaVisita: createNoonDate(document.getElementById('edit-prima-visita').value),
+        reportPrimaVisita: document.getElementById('edit-report-prima-visita').value,
+        dataUltimaVisita: createNoonDate(document.getElementById('edit-ultima-visita').value),
+        reportUltimaVisita: document.getElementById('edit-report-ultima-visita').value,
+        prossimoAppuntamento: createNoonDate(document.getElementById('edit-prossimo-appuntamento').value),
+        
+        // Accordi
+        accordi: document.getElementById('edit-accordi').value
+    };
+    
+    // Verifica se è una nuova azienda o una modifica
+    if (indexValue === 'new') {
+        // È una nuova azienda - aggiungi all'array
+        aziendaData.id = aziende.length;
+        
+        // Aggiungi anche i campi originali per compatibilità
+        aziendaData['Ragione Sociale'] = aziendaData.ragioneSociale;
+        aziendaData['Partita iva'] = aziendaData.partitaIva;
+        aziendaData['Città'] = aziendaData.citta;
+        aziendaData['Via'] = aziendaData.indirizzo;
+        aziendaData['Cap'] = aziendaData.cap;
+        aziendaData['PARCO AUTO (MIS)'] = aziendaData.parcoAuto;
+        aziendaData['Classe numero dipendenti'] = aziendaData.classeDipendenti;
+	aziendaData[' FATTURATO '] = aziendaData.fatturato;  // Nota gli spazi attorno a FAT
+        aziendaData['Nome persona di contatto'] = aziendaData.nomeContatto;
+        aziendaData['Cognome persona di contatto'] = aziendaData.cognomeContatto;
+        aziendaData['Qualifica persona di contatto'] = aziendaData.qualificaContatto;
+        aziendaData['Tel. Persona di contatto'] = aziendaData.telContatto;
+        aziendaData['Mail persona di contatto'] = aziendaData.mailContatto;
+        aziendaData['Accordi'] = aziendaData.accordi;
+        
+        // Aggiungi la nuova azienda all'array
+        aziende.push(aziendaData);
+        
+        // Messaggio di successo
+        var successMessage = 'Nuova azienda aggiunta con successo';
+    } else {
+        // È una modifica - aggiorna l'azienda esistente
+        const index = parseInt(indexValue);
+        const sourceArray = isFiltering ? filteredAziende : aziende;
+        const originalIndex = isFiltering ? sourceArray[index].id : index;
+        
+        // Aggiorna l'azienda con i nuovi dati
+        Object.assign(aziende[originalIndex], aziendaData);
+        
+        // Se stiamo filtrando, aggiorna anche l'elemento nell'array filtrato
+        if (isFiltering) {
+            const i = filteredAziende.findIndex(a => a.id === originalIndex);
+            if (i >= 0) {
+                filteredAziende[i] = aziende[originalIndex];
+            }
+        }
+        
+        // Messaggio di successo
+        var successMessage = 'Dati azienda aggiornati con successo';
+    }
+    
+    // Salva modifiche nel database
+    const saved = await saveToDatabase();
+    
+    // Chiudi il modal
+    document.getElementById('edit-modal').classList.add('hidden');
+    
+    // Aggiorna la tabella
+    updateTable();
+    
+    // Mostra messaggio di conferma
+    showMessage(`${successMessage}${saved ? ' e salvati.' : '.'}`, 'success');
+}
+
+
+function newAzienda() {
+    // Imposta il titolo del modal
+    document.getElementById('modal-title').textContent = 'Nuova Azienda';
+    
+    // Pulisci tutti i campi
+    const inputFields = document.querySelectorAll('#edit-modal input, #edit-modal textarea');
+    inputFields.forEach(field => {
+        field.value = '';
+    });
+    
+    // Imposta un valore speciale per l'indice (usato per identificare che è una nuova azienda)
+    document.getElementById('edit-azienda-index').value = 'new';
+    
+    // Mostra il modal
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+
+
+
+function editAzienda(i) {
+    // Ottieni l'azienda corretta (dall'array filtrato o completo)
+    const a = isFiltering ? filteredAziende[i] : aziende[i];
+    
+    // Aggiorna il titolo del modal con il nome dell'azienda
+    document.getElementById('modal-title').textContent = `Modifica: ${a.ragioneSociale || a['Ragione Sociale'] || 'Azienda'}`;
+    
+    // Popola i campi dati azienda
+    document.getElementById('edit-ragione-sociale').value = a.ragioneSociale || a['Ragione Sociale'] || '';
+    document.getElementById('edit-insegna').value = a.insegna || a['Insegna'] || '';
+    document.getElementById('edit-partita-iva').value = a.partitaIva || a['Partita iva'] || '';
+    document.getElementById('edit-classe-dipendenti').value = a.classeDipendenti || a['Classe numero dipendenti'] || '';
+    document.getElementById('edit-fatturato').value = a.fatturato || a[' FATTURATO '] || a['FATTURATO'] || '';
+    document.getElementById('edit-livello-interesse').value = a.livelloInteresse || '';
+    document.getElementById('edit-stato-trattativa').value = a.statoTrattativa || '';
+    
+    // Popola i campi sede
+    document.getElementById('edit-via').value = a.indirizzo || a['Via'] || '';
+    document.getElementById('edit-citta').value = a.citta || a['Città'] || '';
+    document.getElementById('edit-cap').value = a.cap || a['Cap'] || '';
+    document.getElementById('edit-email').value = a.email || a['Email'] || '';
+    document.getElementById('edit-telefono').value = a.telefono || a['Telefono'] || '';
+    
+    // Popola i campi contatto
+    document.getElementById('edit-nome-contatto').value = a.nomeContatto || a['Nome persona di contatto'] || '';
+    document.getElementById('edit-cognome-contatto').value = a.cognomeContatto || a['Cognome persona di contatto'] || '';
+    document.getElementById('edit-qualifica-contatto').value = a.qualificaContatto || a['Qualifica persona di contatto'] || '';
+    document.getElementById('edit-tel-contatto').value = a.telContatto || a['Tel. Persona di contatto'] || '';
+    document.getElementById('edit-mail-contatto').value = a.mailContatto || a['Mail persona di contatto'] || '';
+    
+    // Popola i campi parco auto
+    document.getElementById('edit-parco-auto').value = a.parcoAuto || a['PARCO AUTO (MIS)'] || '';
+    document.getElementById('edit-auto-proprieta').value = a.autoProprietà || '';
+    document.getElementById('edit-auto-noleggio').value = a.autoNoleggio || '';
+    
+    // Popola i campi visite
+    document.getElementById('edit-prima-visita').value = a.dataPrimaVisita ? 
+        a.dataPrimaVisita.toISOString().split('T')[0] : '';
+    document.getElementById('edit-report-prima-visita').value = a.reportPrimaVisita || '';
+    
+    document.getElementById('edit-ultima-visita').value = a.dataUltimaVisita ? 
+        a.dataUltimaVisita.toISOString().split('T')[0] : '';
+    document.getElementById('edit-report-ultima-visita').value = a.reportUltimaVisita || '';
+    
+    document.getElementById('edit-prossimo-appuntamento').value = a.prossimoAppuntamento ? 
+        a.prossimoAppuntamento.toISOString().split('T')[0] : '';
+    
+    // Popola il campo accordi
+    document.getElementById('edit-accordi').value = a.accordi || a['Accordi'] || '';
+    
+    // Memorizza l'indice per il salvataggio
+    document.getElementById('edit-azienda-index').value = i;
+    
+    // Mostra il modal
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+
+function printAzienda() {
+    // Ottieni il titolo dell'azienda
+    const modalTitle = document.getElementById('modal-title').textContent;
+    
+    // Crea il contenuto HTML per la stampa
+    const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Scheda Azienda - ${modalTitle}</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 20px; 
+                    line-height: 1.4;
+                    color: #333;
+                }
+                .header { 
+                    border-bottom: 2px solid #3B82F6; 
+                    padding-bottom: 10px; 
+                    margin-bottom: 20px;
+                }
+                .header h1 { 
+                    color: #3B82F6; 
+                    margin: 0; 
+                    font-size: 24px;
+                }
+                .section { 
+                    margin-bottom: 20px; 
+                    padding: 15px;
+                    border: 1px solid #E5E7EB;
+                    border-radius: 8px;
+                }
+                .section h2 { 
+                    color: #374151; 
+                    margin: 0 0 10px 0; 
+                    font-size: 16px;
+                    background-color: #F3F4F6;
+                    padding: 8px 12px;
+                    margin: -15px -15px 15px -15px;
+                    border-radius: 7px 7px 0 0;
+                }
+                .field { 
+                    margin-bottom: 8px; 
+                    display: flex;
+                }
+                .field-label { 
+                    font-weight: bold; 
+                    width: 200px; 
+                    color: #4B5563;
+                }
+                .field-value { 
+                    flex: 1;
+                    color: #111827;
+                }
+                .three-column {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr 1fr;
+                    gap: 20px;
+                }
+                .two-column {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 20px;
+                }
+                .full-width {
+                    grid-column: 1 / -1;
+                }
+                @media print {
+                    body { margin: 0; }
+                    .section { break-inside: avoid; }
+                }
+                .empty-value { color: #9CA3AF; font-style: italic; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>${modalTitle}</h1>
+                <p>Data stampa: ${new Date().toLocaleDateString('it-IT')} ${new Date().toLocaleTimeString('it-IT')}</p>
+            </div>
+            
+            <div class="three-column">
+                <div class="section">
+                    <h2>Dati Azienda</h2>
+                    <div class="field">
+                        <div class="field-label">Ragione Sociale:</div>
+                        <div class="field-value">${document.getElementById('edit-ragione-sociale').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Insegna:</div>
+                        <div class="field-value">${document.getElementById('edit-insegna').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">P. IVA:</div>
+                        <div class="field-value">${document.getElementById('edit-partita-iva').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Classe Dipendenti:</div>
+                        <div class="field-value">${document.getElementById('edit-classe-dipendenti').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Fatturato:</div>
+                        <div class="field-value">${document.getElementById('edit-fatturato').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2>Dati Sede</h2>
+                    <div class="field">
+                        <div class="field-label">Via:</div>
+                        <div class="field-value">${document.getElementById('edit-via').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Città:</div>
+                        <div class="field-value">${document.getElementById('edit-citta').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">CAP:</div>
+                        <div class="field-value">${document.getElementById('edit-cap').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Email Azienda:</div>
+                        <div class="field-value">${document.getElementById('edit-email').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Telefono Azienda:</div>
+                        <div class="field-value">${document.getElementById('edit-telefono').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2>Persona di Contatto</h2>
+                    <div class="field">
+                        <div class="field-label">Nome:</div>
+                        <div class="field-value">${document.getElementById('edit-nome-contatto').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Cognome:</div>
+                        <div class="field-value">${document.getElementById('edit-cognome-contatto').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Qualifica:</div>
+                        <div class="field-value">${document.getElementById('edit-qualifica-contatto').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Telefono:</div>
+                        <div class="field-value">${document.getElementById('edit-tel-contatto').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Email:</div>
+                        <div class="field-value">${document.getElementById('edit-mail-contatto').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="two-column">
+                <div class="section">
+                    <h2>Parco Auto</h2>
+                    <div class="field">
+                        <div class="field-label">PARCO AUTO (MIS):</div>
+                        <div class="field-value">${document.getElementById('edit-parco-auto').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Di proprietà:</div>
+                        <div class="field-value">${document.getElementById('edit-auto-proprieta').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">A noleggio:</div>
+                        <div class="field-value">${document.getElementById('edit-auto-noleggio').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2>Visite</h2>
+                    <div class="field">
+                        <div class="field-label">Data prima visita:</div>
+                        <div class="field-value">${document.getElementById('edit-prima-visita').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Report prima visita:</div>
+                        <div class="field-value">${document.getElementById('edit-report-prima-visita').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Data ultima visita:</div>
+                        <div class="field-value">${document.getElementById('edit-ultima-visita').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Report ultima visita:</div>
+                        <div class="field-value">${document.getElementById('edit-report-ultima-visita').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Data prossima visita:</div>
+                        <div class="field-value">${document.getElementById('edit-prossimo-appuntamento').value || '<span class="empty-value">Non specificato</span>'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section full-width">
+                <h2>Accordi</h2>
+                <div class="field-value">${document.getElementById('edit-accordi').value || '<span class="empty-value">Nessun accordo specificato</span>'}</div>
+            </div>
+        </body>
+        </html>
+    `;
+    
+    // Apri una nuova finestra per la stampa
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    
+    // Aspetta che il contenuto sia caricato, poi stampa
+    printWindow.onload = function() {
+        printWindow.focus();
+        printWindow.print();
+        // Chiudi la finestra dopo la stampa (opzionale)
+        // printWindow.close();
+    };
+}
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+    document.getElementById('import-button').addEventListener('click', () => document.getElementById('excel-file').click());
+    document.getElementById('excel-file').addEventListener('change', e => { if(e.target.files.length) importExcel(e.target.files[0]); });
+    document.getElementById('apply-filters-button').addEventListener('click', applyFilters);
+    document.getElementById('reset-filters-button').addEventListener('click', resetFilters);
+    document.getElementById('prev-page').addEventListener('click', () => { if(currentPage>1) goToPage(currentPage-1); });
+    document.getElementById('next-page').addEventListener('click', () => { const totalPages=Math.ceil((isFiltering?filteredAziende:aziende).length/itemsPerPage); if(currentPage<totalPages) goToPage(currentPage+1); });
+    document.getElementById('items-per-page').addEventListener('change', e => { itemsPerPage=parseInt(e.target.value); currentPage=1; updateTable(); });
+    document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('edit-modal').classList.add('hidden'));
+    document.getElementById('modal-save').addEventListener('click', saveAzienda);
+    document.getElementById('new-azienda-button').addEventListener('click', newAzienda);
+    document.getElementById('export-backup-button').addEventListener('click', exportBackup);
+    document.getElementById('import-backup-button').addEventListener('click', () => document.getElementById('backup-file').click());
+    document.getElementById('export-excel-button').addEventListener('click', exportToExcel);
+    document.getElementById('export-csv-button').addEventListener('click', exportToCSV);
+    document.getElementById('modal-print').addEventListener('click', printAzienda);
+    document.getElementById('backup-file').addEventListener('change', e => {
+        if(e.target.files.length) importBackup(e.target.files[0]);
+    });
+
+    // PULSANTE DI SALVATAGGIO DI EMERGENZA
+    document.getElementById('force-save-button').addEventListener('click', async () => {
+        const saved = await saveToDatabase();
+        if (saved) {
+            showMessage('Dati salvati con successo.', 'success');
+        }
+    });
+
+    // Carica dati salvati all'avvio
+    try {
+        const loaded = await loadFromDatabase();
+        if (loaded) {
+            updateTable();
+            document.getElementById('import-count').textContent = aziende.length;
+            document.getElementById('import-stats').classList.remove('hidden');
+            showMessage(`Caricati ${aziende.length} record dal database.`, 'success');
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento iniziale:', error);
+    }
+
+    // Avvia salvataggio automatico
+    startAutoSave(5); // ogni 5 minuti
+
+    console.log('Script inizializzato correttamente');
+});
+
+    </script>
+</body>
+</html>
